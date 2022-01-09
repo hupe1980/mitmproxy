@@ -21,6 +21,8 @@ type ResponseMofifierFunc func(res *http.Response) error
 
 type WSMessageModifierFunc func(msg *WSMessage)
 
+type ErrorHandlerFunc func(http.ResponseWriter, *http.Request, error)
+
 // BufferPool is an interface for getting and returning temporary
 // byte slices for use by io.CopyBuffer.
 type BufferPool interface {
@@ -67,11 +69,12 @@ type Options struct {
 	BufferPool BufferPool
 
 	// ErrorHandler is an optional function that handles errors
-	// reaching the backend or errors from ModifyResponse.
+	// reaching the backend or errors from responseModifier specified in
+	// OnResponse.
 	//
 	// If nil, the default is to log the provided error and return
 	// a 502 Status Bad Gateway response.
-	ErrorHandler func(http.ResponseWriter, *http.Request, error)
+	ErrorHandler ErrorHandlerFunc
 }
 
 type Proxy struct {
@@ -84,7 +87,7 @@ type Proxy struct {
 	bufferPool        BufferPool
 	director          RequestMofifierFunc
 	responseModifier  ResponseMofifierFunc
-	errorHandler      func(http.ResponseWriter, *http.Request, error)
+	errorHandler      ErrorHandlerFunc
 	wsMessageMofifier WSMessageModifierFunc
 }
 
