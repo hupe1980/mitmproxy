@@ -15,9 +15,9 @@ import (
 	"golang.org/x/net/http/httpguts"
 )
 
-type RequestMofifierFunc func(req *http.Request)
+type RequestModifierFunc func(req *http.Request)
 
-type ResponseMofifierFunc func(res *http.Response) error
+type ResponseModifierFunc func(res *http.Response) error
 
 type WSMessageModifierFunc func(msg *WSMessage)
 
@@ -85,8 +85,8 @@ type Proxy struct {
 	wsDialer          *websocket.Dialer
 	flushInterval     time.Duration
 	bufferPool        BufferPool
-	director          RequestMofifierFunc
-	responseModifier  ResponseMofifierFunc
+	director          RequestModifierFunc
+	responseModifier  ResponseModifierFunc
 	errorHandler      ErrorHandlerFunc
 	wsMessageMofifier WSMessageModifierFunc
 }
@@ -161,11 +161,11 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	p.serveHTTP(rw, req)
 }
 
-func (p *Proxy) OnRequest(fn RequestMofifierFunc) {
+func (p *Proxy) OnRequest(fn RequestModifierFunc) {
 	p.director = fn
 }
 
-func (p *Proxy) OnResponse(fn ResponseMofifierFunc) {
+func (p *Proxy) OnResponse(fn ResponseModifierFunc) {
 	p.responseModifier = fn
 }
 
