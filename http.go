@@ -25,10 +25,10 @@ func (p *Proxy) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	if outreq.Body != nil {
 		// Reading from the request body after returning from a handler is not
 		// allowed, and the RoundTrip goroutine that reads the Body can outlive
-		// this handler. This can lead to a crash if the handler panics (see
-		// Issue 46866). Although calling Close doesn't guarantee there isn't
-		// any Read in flight after the handle returns, in practice it's safe to
-		// read after closing it.
+		// this handler. This can lead to a crash if the handler panics.
+		// Although calling Close doesn't guarantee there isn't any Read in
+		// flight after the handle returns, in practice it's safe to read after
+		// closing it.
 		defer outreq.Body.Close()
 	}
 
@@ -55,7 +55,7 @@ func (p *Proxy) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 		outreq.Header.Del(h)
 	}
 
-	// Issue 21096: tell backend applications that care about trailer support
+	// Tell backend applications that care about trailer support
 	// that we support trailers. (We do, but we don't go out of our way to
 	// advertise that unless the incoming client request thought it was worth
 	// mentioning.) Note that we look at req.Header, not outreq.Header, since
@@ -75,8 +75,6 @@ func (p *Proxy) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	for _, h := range hopHeaders {
 		res.Header.Del(h)
 	}
-
-	// ->
 
 	if !p.modifyResponse(rw, res, outreq) {
 		return
