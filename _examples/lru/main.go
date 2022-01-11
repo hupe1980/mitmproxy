@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/hupe1980/golog"
 	"github.com/hupe1980/mitmproxy"
@@ -15,7 +14,7 @@ func main() {
 		panic(err)
 	}
 
-	ca, privKey, err := mitmproxy.NewCA("mitmproxy ca", "mitmproxy", 24*time.Hour)
+	ca, privKey, err := mitmproxy.NewCA()
 	if err != nil {
 		panic(err)
 	}

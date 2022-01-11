@@ -2,6 +2,7 @@ package mitmproxy
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -78,8 +79,8 @@ type Options struct {
 }
 
 type Proxy struct {
+	*logger
 	mitmCfg           *MITMConfig
-	logger            golog.Logger
 	transport         http.RoundTripper
 	wsUpgrader        *websocket.Upgrader
 	wsDialer          *websocket.Dialer
@@ -111,7 +112,7 @@ func New(optFns ...func(*Options)) (*Proxy, error) {
 	}
 
 	if options.MITMConfig == nil {
-		ca, privKey, err := NewCA("mitmproxy ca", "mitmproxy", 24*time.Hour)
+		ca, privKey, err := NewCA()
 		if err != nil {
 			return nil, err
 		}
@@ -127,8 +128,8 @@ func New(optFns ...func(*Options)) (*Proxy, error) {
 	}
 
 	return &Proxy{
+		logger:        &logger{options.Logger},
 		mitmCfg:       options.MITMConfig,
-		logger:        options.Logger,
 		transport:     options.Transport,
 		flushInterval: options.FlushInterval,
 		bufferPool:    options.BufferPool,
@@ -153,7 +154,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			p.serveWS(rw, req)
 			return
 		default:
-			http.Error(rw, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
+			p.errorHandler(rw, req, fmt.Errorf("unsupported upgrade type: %s", reqUpType))
 			return
 		}
 	}
@@ -173,17 +174,17 @@ func (p *Proxy) OnWSMessage(fn WSMessageModifierFunc) {
 	p.wsMessageMofifier = fn
 }
 
-func (p *Proxy) logf(level golog.Level, format string, args ...interface{}) {
-	p.logger.Printf(level, format, args...)
-}
+// func (p *Proxy) logf(level golog.Level, format string, args ...interface{}) {
+// 	p.logger.Printf(level, format, args...)
+// }
 
-func (p *Proxy) logDebugf(format string, args ...interface{}) {
-	p.logf(golog.DEBUG, format, args...)
-}
+// func (p *Proxy) logDebugf(format string, args ...interface{}) {
+// 	p.logf(golog.DEBUG, format, args...)
+// }
 
-func (p *Proxy) logErrorf(format string, args ...interface{}) {
-	p.logf(golog.ERROR, format, args...)
-}
+// func (p *Proxy) logErrorf(format string, args ...interface{}) {
+// 	p.logf(golog.ERROR, format, args...)
+// }
 
 // modifyResponse conditionally runs the optional ModifyResponse hook
 // and reports whether the request should proceed.

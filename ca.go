@@ -21,8 +21,24 @@ import (
 // bytes (2^(8*20)-1).
 var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 
+type CAOptions struct {
+	Name         string
+	Organization string
+	Validity     time.Duration
+}
+
 // NewCA creates a new CA certificate and associated private key.
-func NewCA(name, organization string, validity time.Duration) (*x509.Certificate, *rsa.PrivateKey, error) {
+func NewCA(optFns ...func(*CAOptions)) (*x509.Certificate, *rsa.PrivateKey, error) {
+	options := CAOptions{
+		Name:         "mitmproxy ca",
+		Organization: "mitmproxy",
+		Validity:     24 * time.Hour,
+	}
+
+	for _, fn := range optFns {
+		fn(&options)
+	}
+
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, nil, err
@@ -38,15 +54,15 @@ func NewCA(name, organization string, validity time.Duration) (*x509.Certificate
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
-			CommonName:   name,
-			Organization: []string{organization},
+			CommonName:   options.Name,
+			Organization: []string{options.Organization},
 		},
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
-		NotBefore:             time.Now().Add(-validity),
-		NotAfter:              time.Now().Add(validity),
-		DNSNames:              []string{name},
+		NotBefore:             time.Now().Add(-options.Validity),
+		NotAfter:              time.Now().Add(options.Validity),
+		DNSNames:              []string{options.Name},
 		IsCA:                  true,
 	}
 
@@ -78,14 +94,14 @@ func LoadCA(certFile, keyFile string) (*x509.Certificate, crypto.PrivateKey, err
 	return caCert, ca.PrivateKey, nil
 }
 
-func LoadOrCreateCA(certFile, keyFile string) (*x509.Certificate, crypto.PrivateKey, error) {
+func LoadOrCreateCA(certFile, keyFile string, optFns ...func(*CAOptions)) (*x509.Certificate, crypto.PrivateKey, error) {
 	if caCert, privKey, err := LoadCA(certFile, keyFile); err == nil {
 		return caCert, privKey, nil
 	} else if !os.IsNotExist(err) {
 		return nil, nil, err
 	}
 
-	caCert, privKey, err := NewCA("mitmproxy ca", "mitmproxy", 24*time.Hour)
+	caCert, privKey, err := NewCA(optFns...)
 	if err != nil {
 		return nil, nil, err
 	}

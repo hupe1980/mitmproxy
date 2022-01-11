@@ -19,6 +19,17 @@ import (
 	"github.com/hupe1980/golog"
 )
 
+var (
+	DefaultTLSServerConfig = &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		NextProtos: []string{"http/1.1"},
+
+		// Accept client certs without verifying them
+		// Note that we will still verify remote server certs
+		InsecureSkipVerify: true, //nolint: gosec // ok
+	}
+)
+
 type CertTemplateGenFunc func(serial *big.Int, ski []byte, hostname, organization string, validity time.Duration) *x509.Certificate
 
 type MITMOptions struct {
@@ -27,6 +38,9 @@ type MITMOptions struct {
 
 	// Validity of the generated certificates
 	Validity time.Duration
+
+	// Config structure is used to configure the TLS server.
+	TLSServerConfig *tls.Config
 
 	// Storage for generated certificates
 	CertStorage CertStorage
@@ -41,28 +55,32 @@ type MITMOptions struct {
 // MITMConfig is a set of configuration values that are used to build TLS configs
 // capable of MITM.
 type MITMConfig struct {
+	*logger
 	ca           *x509.Certificate // Root certificate authority
 	caPrivateKey crypto.PrivateKey // CA private key
 
 	// roots is a CertPool that contains the root CA GetOrCreateCert
 	// it serves a single purpose -- to verify the cached domain certs
-	roots           *x509.CertPool
-	privateKey      crypto.Signer
-	validity        time.Duration
-	keyID           []byte // SKI to use in generated certificates (https://tools.ietf.org/html/rfc3280#section-4.2.1.2)
+	roots      *x509.CertPool
+	privateKey crypto.Signer
+	validity   time.Duration
+
+	// SKI to use in generated certificates (https://tools.ietf.org/html/rfc3280#section-4.2.1.2)
+	keyID           []byte
 	organization    string
+	tlsServerConfig *tls.Config
 	certStorage     CertStorage
 	certTemplateGen CertTemplateGenFunc
-	logger          golog.Logger
 }
 
 // NewMITMConfig creates a new MITM configuration
 func NewMITMConfig(ca *x509.Certificate, caPrivKey crypto.PrivateKey, optFns ...func(*MITMOptions)) (*MITMConfig, error) {
 	options := MITMOptions{
-		CertStorage:  NewMapCertStorage(),
-		Organization: "mitmproxy",
-		Validity:     time.Hour,
-		Logger:       golog.NewGoLogger(golog.INFO, log.Default()),
+		CertStorage:     NewMapCertStorage(),
+		Organization:    "mitmproxy",
+		Validity:        time.Hour,
+		TLSServerConfig: DefaultTLSServerConfig,
+		Logger:          golog.NewGoLogger(golog.INFO, log.Default()),
 	}
 
 	for _, fn := range optFns {
@@ -124,15 +142,16 @@ func NewMITMConfig(ca *x509.Certificate, caPrivKey crypto.PrivateKey, optFns ...
 	keyID := h.Sum(nil)
 
 	return &MITMConfig{
+		logger:          &logger{options.Logger},
 		ca:              ca,
 		caPrivateKey:    caPrivKey,
 		privateKey:      priv,
 		keyID:           keyID,
 		validity:        options.Validity,
 		organization:    options.Organization,
+		tlsServerConfig: options.TLSServerConfig,
 		certStorage:     options.CertStorage,
 		certTemplateGen: options.CertTemplateGen,
-		logger:          options.Logger,
 		roots:           roots,
 	}, nil
 }
@@ -146,22 +165,16 @@ func (c *MITMConfig) CA() *x509.Certificate {
 // domain certificates on-the-fly using the SNI extension (if specified)
 // or the hostname
 func (c *MITMConfig) NewTLSConfigForHost(hostname string) *tls.Config {
-	tlsConfig := &tls.Config{
-		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			host := clientHello.ServerName
-			if host == "" {
-				host = hostname
-			}
+	tlsConfig := c.tlsServerConfig.Clone()
 
-			return c.GetOrCreateCert(host)
-		},
-		MinVersion: tls.VersionTLS12,
-		NextProtos: []string{"http/1.1"},
+	tlsConfig.GetCertificate = func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		host := clientHello.ServerName
+		if host == "" {
+			host = hostname
+		}
+
+		return c.GetOrCreateCert(host)
 	}
-
-	// Accept client certs without verifying them
-	// Note that we will still verify remote server certs
-	tlsConfig.InsecureSkipVerify = true
 
 	return tlsConfig
 }
@@ -218,14 +231,6 @@ func (c *MITMConfig) GetOrCreateCert(hostname string) (*tls.Certificate, error) 
 	c.certStorage.Add(hostname, tlsCertificate)
 
 	return tlsCertificate, nil
-}
-
-func (c *MITMConfig) logf(level golog.Level, format string, args ...interface{}) {
-	c.logger.Printf(level, format, args...)
-}
-
-func (c *MITMConfig) logDebugf(format string, args ...interface{}) {
-	c.logf(golog.DEBUG, format, args...)
 }
 
 func generateKey(privateKey crypto.PrivateKey) (crypto.Signer, error) {
