@@ -46,6 +46,12 @@ func (p *Proxy) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	outreq.Close = false
 
+	// If User-Agent is not set by client, then explicitly
+	// disable it so it's not set to default value by std lib
+	if _, ok := outreq.Header["User-Agent"]; !ok {
+		outreq.Header.Set("User-Agent", "")
+	}
+
 	removeConnectionHeaders(outreq.Header)
 
 	// Remove hop-by-hop headers to the backend. Especially
