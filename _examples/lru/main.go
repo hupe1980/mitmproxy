@@ -9,18 +9,13 @@ import (
 )
 
 func main() {
-	certstorage, err := mitmproxy.NewLRUStorage(100)
+	cs, err := mitmproxy.NewLRUStorage(100)
 	if err != nil {
 		panic(err)
 	}
 
-	ca, privKey, err := mitmproxy.NewCA()
-	if err != nil {
-		panic(err)
-	}
-
-	mitmCfg, err := mitmproxy.NewMITMConfig(ca, privKey, func(m *mitmproxy.MITMOptions) {
-		m.CertStorage = certstorage
+	mitmCfg, err := mitmproxy.NewMITMConfig(func(m *mitmproxy.MITMOptions) {
+		m.CertStorage = cs
 	})
 	if err != nil {
 		panic(err)

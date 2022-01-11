@@ -11,24 +11,16 @@ import (
 )
 
 func main() {
-	certstorage, err := mitmproxy.NewLRUStorage(100)
-	if err != nil {
-		panic(err)
-	}
-
-	ca, privKey, err := mitmproxy.LoadOrCreateCA("ca.cert", "ca.key", func(c *mitmproxy.CAOptions) {
+	ca, privateKey, err := mitmproxy.LoadOrCreateCA("ca.cert", "ca.key", func(c *mitmproxy.CAOptions) {
 		c.Validity = 365 * 24 * time.Hour
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	tlsServerConfig := mitmproxy.DefaultTLSServerConfig.Clone()
-	tlsServerConfig.NextProtos = []string{"h2", "http/1.1"}
-
-	mitmCfg, err := mitmproxy.NewMITMConfig(ca, privKey, func(m *mitmproxy.MITMOptions) {
-		m.CertStorage = certstorage
-		m.TLSServerConfig = tlsServerConfig
+	mitmCfg, err := mitmproxy.NewMITMConfig(func(m *mitmproxy.MITMOptions) {
+		m.CA = ca
+		m.PrivateKey = privateKey
 	})
 	if err != nil {
 		panic(err)
@@ -53,7 +45,7 @@ func main() {
 
 	router := mux.NewRouter().SkipClean(true)
 
-	router.Host("proxy.cert").Handler(mitmproxy.NewCertHandler(ca))
+	router.Host("proxy.cert").Handler(mitmproxy.NewCertHandler(mitmCfg.CA()))
 	router.PathPrefix("").Handler(proxy)
 
 	log.Fatal(http.ListenAndServe(":8000", router))

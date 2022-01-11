@@ -59,7 +59,7 @@ func StartProxy(wg *sync.WaitGroup) {
 
 	proxy, err := mitmproxy.New()
 	if err != nil {
-		panic("New" + err.Error())
+		panic(err)
 	}
 
 	proxy.OnWSMessage(func(msg *mitmproxy.WSMessage) {
@@ -68,7 +68,7 @@ func StartProxy(wg *sync.WaitGroup) {
 
 	go func() {
 		if err := http.ListenAndServe("localhost:54321", proxy); err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 	}()
 

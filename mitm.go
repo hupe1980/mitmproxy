@@ -33,6 +33,10 @@ var (
 type CertTemplateGenFunc func(serial *big.Int, ski []byte, hostname, organization string, validity time.Duration) *x509.Certificate
 
 type MITMOptions struct {
+	CA *x509.Certificate
+
+	PrivateKey crypto.PrivateKey
+
 	// Organization (will be used for generated certificates)
 	Organization string
 
@@ -74,7 +78,7 @@ type MITMConfig struct {
 }
 
 // NewMITMConfig creates a new MITM configuration
-func NewMITMConfig(ca *x509.Certificate, caPrivKey crypto.PrivateKey, optFns ...func(*MITMOptions)) (*MITMConfig, error) {
+func NewMITMConfig(optFns ...func(*MITMOptions)) (*MITMConfig, error) {
 	options := MITMOptions{
 		CertStorage:     NewMapCertStorage(),
 		Organization:    "mitmproxy",
@@ -85,6 +89,16 @@ func NewMITMConfig(ca *x509.Certificate, caPrivKey crypto.PrivateKey, optFns ...
 
 	for _, fn := range optFns {
 		fn(&options)
+	}
+
+	if options.CA == nil || options.PrivateKey == nil {
+		ca, privKey, err := NewCA()
+		if err != nil {
+			return nil, err
+		}
+
+		options.CA = ca
+		options.PrivateKey = privKey
 	}
 
 	if options.CertTemplateGen == nil {
@@ -114,10 +128,10 @@ func NewMITMConfig(ca *x509.Certificate, caPrivKey crypto.PrivateKey, optFns ...
 	}
 
 	roots := x509.NewCertPool()
-	roots.AddCert(ca)
+	roots.AddCert(options.CA)
 
 	// Generating the private key that will be used for domain certificates
-	priv, err := generateKey(caPrivKey)
+	priv, err := generateKey(options.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -143,8 +157,8 @@ func NewMITMConfig(ca *x509.Certificate, caPrivKey crypto.PrivateKey, optFns ...
 
 	return &MITMConfig{
 		logger:          &logger{options.Logger},
-		ca:              ca,
-		caPrivateKey:    caPrivKey,
+		ca:              options.CA,
+		caPrivateKey:    options.PrivateKey,
 		privateKey:      priv,
 		keyID:           keyID,
 		validity:        options.Validity,
@@ -156,7 +170,7 @@ func NewMITMConfig(ca *x509.Certificate, caPrivKey crypto.PrivateKey, optFns ...
 	}, nil
 }
 
-// GetCA returns the authority cert
+// CA returns the authority cert
 func (c *MITMConfig) CA() *x509.Certificate {
 	return c.ca
 }

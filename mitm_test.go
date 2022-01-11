@@ -11,16 +11,7 @@ import (
 )
 
 func TestMITM(t *testing.T) {
-	ca, privateKey, err := NewCA(func(c *CAOptions) {
-		c.Name = "mitmproxy ca"
-		c.Organization = "mitmproxy"
-		c.Validity = 24 * time.Hour
-	})
-	assert.NoError(t, err)
-	assert.NotNil(t, ca)
-	assert.NotNil(t, privateKey)
-
-	c, err := NewMITMConfig(ca, privateKey, func(m *MITMOptions) {
+	c, err := NewMITMConfig(func(m *MITMOptions) {
 		m.Validity = 20 * time.Hour
 		m.Organization = "Test Organization"
 	})

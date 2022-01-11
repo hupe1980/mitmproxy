@@ -112,12 +112,7 @@ func New(optFns ...func(*Options)) (*Proxy, error) {
 	}
 
 	if options.MITMConfig == nil {
-		ca, privKey, err := NewCA()
-		if err != nil {
-			return nil, err
-		}
-
-		mitmCfg, err := NewMITMConfig(ca, privKey, func(m *MITMOptions) {
+		mitmCfg, err := NewMITMConfig(func(m *MITMOptions) {
 			m.Logger = options.Logger
 		})
 		if err != nil {
