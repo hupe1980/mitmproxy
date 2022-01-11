@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -80,7 +79,8 @@ func (p *Proxy) serveWS(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if req.URL.Scheme == "" {
-		outreq.URL = &url.URL{Scheme: "wss", Host: outreq.Host, Path: outreq.URL.Path}
+		outreq.URL.Host = outreq.Host
+		outreq.URL.Scheme = "wss"
 	}
 
 	if p.director != nil {

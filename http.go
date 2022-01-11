@@ -3,7 +3,6 @@ package mitmproxy
 import (
 	"crypto/tls"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"golang.org/x/net/http/httpguts"
@@ -37,7 +36,8 @@ func (p *Proxy) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if outreq.URL.Scheme == "" {
-		outreq.URL = &url.URL{Scheme: "https", Host: outreq.Host, Path: outreq.URL.Path}
+		outreq.URL.Host = outreq.Host
+		outreq.URL.Scheme = "https"
 	}
 
 	if p.director != nil {
@@ -137,6 +137,7 @@ func (p *Proxy) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 func newDefaultTransport() http.RoundTripper {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint: gosec //ok
+	//transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 
 	return transport
 }
